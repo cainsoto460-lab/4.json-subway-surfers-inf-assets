@@ -1,0 +1,113 @@
+<!-- Subway Surfers Buenos Aires -->
+<base href="https://cdn.jsdelivr.net/gh/cainsoto460-lab/4.json-subway-surfers-inf-assets@main/">
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Subway Surfers</title>
+    <style>
+        * { margin: 0; padding: 0; }
+        html, body { width: 100vw; height: 100vh; overflow: hidden; background: #000; }
+    </style>
+    <script>
+        window.PokiSDK = {
+            init:                () => Promise.resolve(),
+            gameLoadingStart:    () => {},
+            gameLoadingProgress: () => {},
+            gameLoadingFinished: () => {},
+            commercialBreak:     () => Promise.resolve(),
+            rewardedBreak:       () => Promise.resolve(true),
+            setDebug:            () => {},
+            gameplayStart:       () => {},
+            gameplayStop:        () => {},
+        };
+
+        window.config = {
+            loader:              "unity",
+            debug:               false,
+            title:               "Subway Surfers",
+            maxRatio:            16 / 9,
+            minRatio:            9 / 16,
+            unityWebglBuildUrl:  "4.json",
+            unityWebglLoaderUrl: "Unityloader.2019.js",
+            fileSize:            36,
+            cachedDecompressedFileSizes: {
+                '4.data.unityweb':           19343219,
+                'wasm_code_shared.unityweb': 7338464,
+                'wasm_framework.unityweb':   93787,
+            },
+        };
+
+        window.mergedBlobUrls = {};
+        window.assetsReady    = false;
+
+        async function mergeSplitFile(fileUrlBase, numParts = 2) {
+            const partUrls = Array.from({ length: numParts }, (_, i) =>
+                `${fileUrlBase}.part${i + 1}`
+            );
+            try {
+                const responses = await Promise.all(partUrls.map(url => fetch(url)));
+                if (responses.some(r => !r.ok)) return null;
+                const parts = await Promise.all(responses.map(r => r.arrayBuffer()));
+                return URL.createObjectURL(new Blob(parts, { type: 'application/octet-stream' }));
+            } catch (e) { return null; }
+        }
+
+        function setupXHRInterceptor() {
+            if (window.xhrInterceptorInstalled) return;
+            const originalOpen = XMLHttpRequest.prototype.open;
+            const originalSend = XMLHttpRequest.prototype.send;
+
+            XMLHttpRequest.prototype.open = function(method, url, ...args) {
+                this._url = url;
+                let finalUrl = url;
+                for (const [filename, blobUrl] of Object.entries(window.mergedBlobUrls)) {
+                    if (url.includes(filename)) { finalUrl = blobUrl; break; }
+                }
+                return originalOpen.call(this, method, finalUrl, ...args);
+            };
+
+            XMLHttpRequest.prototype.send = function(...args) {
+                const xhr = this;
+                if (!window.assetsReady) {
+                    const check = setInterval(() => {
+                        if (window.assetsReady) { clearInterval(check); originalSend.apply(xhr, args); }
+                    }, 50);
+                    return;
+                }
+                return originalSend.apply(this, args);
+            };
+            window.xhrInterceptorInstalled = true;
+        }
+
+        async function prepareGameAssets() {
+            try {
+                window.assetsReady = false;
+                delete window.xhrInterceptorInstalled;
+                window.mergedBlobUrls = {};
+                setupXHRInterceptor();
+
+                // wasm_code_shared is split into 2 parts
+                const wasm = await mergeSplitFile('wasm_code_shared.unityweb', 2);
+                if (wasm) window.mergedBlobUrls['wasm_code_shared.unityweb'] = wasm;
+
+                // 4.data.unityweb is NOT split - fetch directly
+                const dataResp = await fetch('4.data.unityweb');
+                if (dataResp.ok) {
+                    const dataBlob = await dataResp.blob();
+                    window.mergedBlobUrls['4.data.unityweb'] = URL.createObjectURL(dataBlob);
+                }
+
+                window.assetsReady = true;
+            } catch (e) {
+                window.assetsReady = true;
+            }
+        }
+
+        prepareGameAssets();
+    </script>
+</head>
+<body>
+    <script src="Unityloader.2019.js"></script>
+    <script src="masterloader.js"></script>
+</body>
+</html>
