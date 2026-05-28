@@ -7,7 +7,7 @@
         * { margin: 0; padding: 0; }
         html, body { width: 100vw; height: 100vh; overflow: hidden; background: #000; font-family: Arial, sans-serif; }
         #unity-container { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
-        #unity-canvas { width: 960px; height: 600px; }
+        #unity-canvas { width: 960px; height: 600px; background: #000; }
         #loading-screen {
             position: fixed; top: 0; left: 0;
             width: 100%; height: 100%;
@@ -45,6 +45,15 @@
 </div>
 
 <script>
+    // Fix parent.showUnitywebNoSupport error
+    window.showUnitywebNoSupport = function() {};
+    if (window.parent && !window.parent.showUnitywebNoSupport) {
+        window.parent.showUnitywebNoSupport = function() {};
+    }
+
+    // Fix my4399UnityModule not defined
+    window.my4399UnityModule = function(Module) { return Module; };
+
     // Kill all ads
     window.PokiSDK = {
         init:                () => Promise.resolve(),
@@ -97,13 +106,11 @@
     async function boot() {
         interceptXHR();
 
-        // Merge wasm_code_shared parts
         const wasmBlob = await mergeSplitFile('wasm_code_shared.unityweb', 2);
         if (wasmBlob) window.mergedBlobUrls['wasm_code_shared.unityweb'] = wasmBlob;
 
         window.assetsReady = true;
 
-        // Load UnityLoader then boot game
         const script = document.createElement('script');
         script.src = 'Unityloader.2019.js';
         script.onload = function() {
