@@ -3,103 +3,85 @@
 <head>
     <meta charset="utf-8">
     <title>Subway Surfers</title>
-    <style>
-        * { margin: 0; padding: 0; }
-        html, body { width: 100vw; height: 100vh; overflow: hidden; background: #000; }
-        #game { width: 100%; height: 100%; }
-    </style>
+    <script>
+        // Kill all ads dead
+        window.PokiSDK = {
+            init:                () => Promise.resolve(),
+            gameLoadingStart:    () => {},
+            gameLoadingProgress: () => {},
+            gameLoadingFinished: () => {},
+            commercialBreak:     () => Promise.resolve(),
+            rewardedBreak:       () => Promise.resolve(true),
+            setDebug:            () => {},
+            gameplayStart:       () => {},
+            gameplayStop:        () => {},
+        };
+
+        // Fix Unity errors
+        window.showUnitywebNoSupport = function() {};
+        if (window.parent) window.parent.showUnitywebNoSupport = function() {};
+        window.my4399UnityModule = function(m) { return m; };
+
+        // Game config - matches exactly what master-loader expects
+        window.config = {
+            loader:              "unity",
+            debug:               false,
+            title:               "Subway Surfers",
+            maxRatio:            16 / 9,
+            minRatio:            9 / 16,
+            numScreenshots:      0,
+            unityWebglBuildUrl:  "4.json",
+            unityWebglLoaderUrl: "Unityloader.2019.js",
+            fileSize:            36,
+            commentChangeTime:   5000,
+            spinnerRemoveDelay:  1000,
+        };
+
+        // Merge split files
+        window.mergedBlobUrls = {};
+        window.assetsReady = false;
+
+        async function mergeSplitFile(base, parts) {
+            const urls = Array.from({length: parts}, (_, i) => `${base}.part${i+1}`);
+            const responses = await Promise.all(urls.map(u => fetch(u)));
+            if (responses.some(r => !r.ok)) return null;
+            const buffers = await Promise.all(responses.map(r => r.arrayBuffer()));
+            return URL.createObjectURL(new Blob(buffers, {type: 'application/octet-stream'}));
+        }
+
+        function interceptXHR() {
+            const origOpen = XMLHttpRequest.prototype.open;
+            const origSend = XMLHttpRequest.prototype.send;
+            XMLHttpRequest.prototype.open = function(method, url, ...args) {
+                let finalUrl = url;
+                for (const [name, blob] of Object.entries(window.mergedBlobUrls)) {
+                    if (url.includes(name)) { finalUrl = blob; break; }
+                }
+                return origOpen.call(this, method, finalUrl, ...args);
+            };
+            XMLHttpRequest.prototype.send = function(...args) {
+                const xhr = this;
+                if (!window.assetsReady) {
+                    const wait = setInterval(() => {
+                        if (window.assetsReady) { clearInterval(wait); origSend.apply(xhr, args); }
+                    }, 50);
+                    return;
+                }
+                return origSend.apply(this, args);
+            };
+        }
+
+        async function prepareAssets() {
+            interceptXHR();
+            const wasmBlob = await mergeSplitFile('wasm_code_shared.unityweb', 2);
+            if (wasmBlob) window.mergedBlobUrls['wasm_code_shared.unityweb'] = wasmBlob;
+            window.assetsReady = true;
+        }
+
+        prepareAssets();
+    </script>
 </head>
 <body>
-<div id="game"></div>
-
-<script>
-    window.showUnitywebNoSupport = function() {};
-    if (window.parent) window.parent.showUnitywebNoSupport = function() {};
-    window.my4399UnityModule = function(m) { return m; };
-
-    window.PokiSDK = {
-        init:                () => Promise.resolve(),
-        gameLoadingStart:    () => {},
-        gameLoadingProgress: () => {},
-        gameLoadingFinished: () => {},
-        commercialBreak:     () => Promise.resolve(),
-        rewardedBreak:       () => Promise.resolve(true),
-        setDebug:            () => {},
-        gameplayStart:       () => {},
-        gameplayStop:        () => {},
-    };
-
-    window.mergedBlobUrls = {};
-    window.assetsReady = false;
-
-    async function mergeSplitFile(base, parts) {
-        const urls = Array.from({length: parts}, (_, i) => `${base}.part${i+1}`);
-        const responses = await Promise.all(urls.map(u => fetch(u)));
-        if (responses.some(r => !r.ok)) return null;
-        const buffers = await Promise.all(responses.map(r => r.arrayBuffer()));
-        return URL.createObjectURL(new Blob(buffers, {type: 'application/octet-stream'}));
-    }
-
-    function interceptXHR() {
-        const origOpen = XMLHttpRequest.prototype.open;
-        const origSend = XMLHttpRequest.prototype.send;
-        XMLHttpRequest.prototype.open = function(method, url, ...args) {
-            let finalUrl = url;
-            for (const [name, blob] of Object.entries(window.mergedBlobUrls)) {
-                if (url.includes(name)) { finalUrl = blob; break; }
-            }
-            return origOpen.call(this, method, finalUrl, ...args);
-        };
-        XMLHttpRequest.prototype.send = function(...args) {
-            const xhr = this;
-            if (!window.assetsReady) {
-                const wait = setInterval(() => {
-                    if (window.assetsReady) { clearInterval(wait); origSend.apply(xhr, args); }
-                }, 50);
-                return;
-            }
-            return origSend.apply(this, args);
-        };
-    }
-
-    async function boot() {
-        interceptXHR();
-        const wasmBlob = await mergeSplitFile('wasm_code_shared.unityweb', 2);
-        if (wasmBlob) window.mergedBlobUrls['wasm_code_shared.unityweb'] = wasmBlob;
-        window.assetsReady = true;
-
-        const script = document.createElement('script');
-        script.src = 'Unityloader.2019.js';
-        script.onload = function() {
-            window.unityGame = UnityLoader.instantiate("game", "4.json", {
-                onProgress: function(instance, progress) {
-                    if (progress >= 1) {
-                        // Game fully loaded — make sure canvas fills screen
-                        setTimeout(() => {
-                            const canvases = document.querySelectorAll('canvas');
-                            canvases.forEach(c => {
-                                c.style.width = '100vw';
-                                c.style.height = '100vh';
-                                c.style.display = 'block';
-                            });
-                            const gameDiv = document.getElementById('game');
-                            if (gameDiv) {
-                                gameDiv.style.cssText = 'display:block;position:fixed;top:0;left:0;width:100vw;height:100vh;';
-                            }
-                        }, 1000);
-                    }
-                },
-                Module: {
-                    onRuntimeInitialized: function() {
-                        console.log('Unity runtime initialized!');
-                    }
-                }
-            });
-        };
-        document.body.appendChild(script);
-    }
-
-    boot();
-</script>
+    <script src="masterloader.js"></script>
 </body>
 </html>
