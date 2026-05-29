@@ -3,7 +3,7 @@
     <meta charset="utf-8" />
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title>Subway Surfers: Buenos Aires</title>
-    <script src="Unityloader.2019.js"></script>
+    <script src="4399.ss.js"></script>
     <script>
         window.config = {
             loader: "unity",
@@ -13,12 +13,11 @@
             title: 'Subway Surfers: Buenos Aires',
             unityVersion: '2019.2.0f1',
             unityWebglBuildUrl: '4.json',
-            unityWebglLoaderUrl: 'Unityloader.2019.js',
             fileSize: 36,
             cachedDecompressedFileSizes: {
-                'wasm_framework.unityweb':    93787,
-                'wasm_code_shared.unityweb':  7338464,
-                '4.data.unityweb':            19343219,
+                'wasm_framework.unityweb':   93787,
+                'wasm_code_shared.unityweb': 7338464,
+                '4.data.unityweb':           19343219,
             },
         };
 
@@ -89,7 +88,6 @@
                 window.mergedBlobUrls = {};
                 setupXHRInterceptor();
 
-                // wasm_code_shared is split into 2 parts
                 const filesToMerge = ['wasm_code_shared.unityweb'];
                 for (const filename of filesToMerge) {
                     const blobUrl = await mergeSplitFile(filename, 2);
