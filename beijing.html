@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,shrink-to-fit=no"/>
+    <title>Subway Surfers: Beijing</title>
+    <script>
+        const REPO = "https://cdn.jsdelivr.net/gh/cainsoto460-lab/4.json-subway-surfers-inf-assets@main/";
+        const STATIC = "https://static.randomkzn.com/Build/5/";
+
+        window.config = {
+            loader: "unity",
+            debug: false,
+            maxRatio: 16 / 9,
+            minRatio: 9 / 16,
+            title: "Subway Surfers: Beijing",
+            unityVersion: "2019.2.0f1",
+            unityWebglBuildUrl: STATIC + "5.json",
+            fileSize: 42,
+        };
+
+        window.mergedBlobUrls = {};
+        window.assetsReady = false;
+
+        async function fetchBlob(url) {
+            try {
+                const r = await fetch(url);
+                if (!r.ok) return null;
+                return URL.createObjectURL(new Blob([await r.arrayBuffer()], { type: 'application/octet-stream' }));
+            } catch(e) { return null; }
+        }
+
+        async function mergeParts(base, n) {
+            try {
+                const parts = await Promise.all(
+                    Array.from({length: n}, (_, i) => fetch(base + '.part' + (i+1)))
+                );
+                if (parts.some(r => !r.ok)) return null;
+                const bufs = await Promise.all(parts.map(r => r.arrayBuffer()));
+                return URL.createObjectURL(new Blob(bufs, { type: 'application/octet-stream' }));
+            } catch(e) { return null; }
+        }
+
+        function intercept() {
+            if (window._intercepted) return;
+            const oOpen = XMLHttpRequest.prototype.open;
+            const oSend = XMLHttpRequest.prototype.send;
+            const oFetch = window.fetch;
+
+            XMLHttpRequest.prototype.open = function(m, url, ...a) {
+                let u = url;
+                for (const [k, b] of Object.entries(window.mergedBlobUrls))
+                    if (u && u.includes(k)) { u = b; break; }
+                return oOpen.call(this, m, u, ...a);
+            };
+
+            XMLHttpRequest.prototype.send = function(...a) {
+                const x = this;
+                if (!window.assetsReady) {
+                    const t = setInterval(() => {
+                        if (window.assetsReady) { clearInterval(t); oSend.apply(x, a); }
+                    }, 50);
+                    return;
+                }
+                return oSend.apply(this, a);
+            };
+
+            window.fetch = function(input, init) {
+                let url = typeof input === 'string' ? input : (input && input.url);
+                for (const [k, b] of Object.entries(window.mergedBlobUrls))
+                    if (url && url.includes(k)) return oFetch(b, init);
+                return oFetch(input, init);
+            };
+
+            window._intercepted = true;
+        }
+
+        async function prepareAssets() {
+            window.assetsReady = false;
+            window.mergedBlobUrls = {};
+            intercept();
+
+            // 5.data.unityweb — from randomkzn static CDN
+            const data = await fetchBlob(STATIC + '5.data.unityweb');
+            if (data) {
+                window.mergedBlobUrls['5.data.unityweb'] = data;
+                window.mergedBlobUrls['data.unityweb'] = data;
+            }
+
+            // wasm code — split parts from your repo
+            const wasmCode = await mergeParts(REPO + 'wasm_code_shared.unityweb', 2);
+            if (wasmCode) {
+                window.mergedBlobUrls['wasm_code_shared.unityweb'] = wasmCode;
+                window.mergedBlobUrls['wasm_code'] = wasmCode;
+            }
+
+            // wasm framework — from your repo
+            const framework = await fetchBlob(REPO + 'wasm_framework.unityweb');
+            if (framework) {
+                window.mergedBlobUrls['wasm_framework.unityweb'] = framework;
+                window.mergedBlobUrls['wasm_framework'] = framework;
+            }
+
+            window.assetsReady = true;
+            console.log('Assets ready:', Object.keys(window.mergedBlobUrls));
+        }
+
+        prepareAssets();
+    </script>
+</head>
+<body>
+    <script src="https://cdn.jsdelivr.net/gh/cainsoto460-lab/4.json-subway-surfers-inf-assets@main/4399.ss.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/cainsoto460-lab/4.json-subway-surfers-inf-assets@main/masterloader.js"></script>
+</body>
+</html>
