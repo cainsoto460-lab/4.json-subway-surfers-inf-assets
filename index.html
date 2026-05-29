@@ -1,112 +1,214 @@
-<base href="https://cdn.jsdelivr.net/gh/cainsoto460-lab/4.json-subway-surfers-inf-assets@main/">
-<html>
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>Subway Surfers: Buenos Aires</title>
-    <script src="4399.ss.js"></script>
-    <script>
-        window.config = {
-            loader: "unity",
-            debug: false,
-            maxRatio: 16 / 9,
-            minRatio: 9 / 16,
-            title: 'Subway Surfers: Buenos Aires',
-            unityVersion: '2019.2.0f1',
-            unityWebglBuildUrl: '4.json',
-            unityWebglLoaderUrl: 'Unityloader.2019.js',
-            fileSize: 36,
-            cachedDecompressedFileSizes: {
-                'wasm_framework.unityweb':   93787,
-                'wasm_code_shared.unityweb': 7338464,
-                '4.data.unityweb':           19343219,
-            },
-        };
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Subway Surfers</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
-        window.PokiSDK = {
-            init:                () => Promise.resolve(),
-            gameLoadingStart:    () => {},
-            gameLoadingProgress: () => {},
-            gameLoadingFinished: () => {},
-            commercialBreak:     () => Promise.resolve(),
-            rewardedBreak:       () => Promise.resolve(true),
-            setDebug:            () => {},
-            gameplayStart:       () => {},
-            gameplayStop:        () => {},
-        };
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: monospace;
+    }
 
-        window.showUnitywebNoSupport = function() {};
-        if (window.parent) window.parent.showUnitywebNoSupport = function() {};
-        window.my4399UnityModule = function(m) { return m; };
+    #loader-screen {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: #0a0a0a;
+      z-index: 9999;
+      transition: opacity 0.4s ease;
+    }
 
-        window.mergedBlobUrls = {};
-        window.assetsReady = false;
+    #loader-screen.fade-out { opacity: 0; pointer-events: none; }
 
-        async function mergeSplitFile(fileUrlBase, numParts = 2) {
-            const partUrls = Array.from({ length: numParts }, (_, i) => 
-                `${fileUrlBase}.part${i + 1}`
-            );
-            try {
-                const responses = await Promise.all(partUrls.map(url => fetch(url)));
-                if (responses.some(r => !r.ok)) return null;
-                const parts = await Promise.all(responses.map(r => r.arrayBuffer()));
-                return URL.createObjectURL(new Blob(parts, { type: 'application/octet-stream' }));
-            } catch (error) {
-                return null;
-            }
-        }
+    .loader-logo {
+      font-size: 28px; font-weight: 900;
+      color: #fff; letter-spacing: 4px;
+      text-transform: uppercase;
+      margin-bottom: 32px;
+      text-shadow: 0 0 20px rgba(255,180,0,0.6);
+    }
 
-        function setupXHRInterceptor() {
-            if (window.xhrInterceptorInstalled) return;
-            const originalOpen = XMLHttpRequest.prototype.open;
-            const originalSend = XMLHttpRequest.prototype.send;
+    .loader-logo span { color: #ffb400; }
 
-            XMLHttpRequest.prototype.open = function(method, url, ...args) {
-                this._url = url;
-                let finalUrl = url;
-                for (const [filename, blobUrl] of Object.entries(window.mergedBlobUrls)) {
-                    if (url.includes(filename)) { finalUrl = blobUrl; break; }
-                }
-                return originalOpen.call(this, method, finalUrl, ...args);
-            };
+    .track {
+      width: 300px; height: 4px;
+      background: #1e1e1e; border-radius: 99px;
+      overflow: hidden; margin-bottom: 14px;
+    }
 
-            XMLHttpRequest.prototype.send = function(...args) {
-                const xhr = this;
-                if (!window.assetsReady) {
-                    const checkReady = setInterval(() => {
-                        if (window.assetsReady) { clearInterval(checkReady); originalSend.apply(xhr, args); }
-                    }, 50);
-                    return;
-                }
-                return originalSend.apply(this, args);
-            };
-            window.xhrInterceptorInstalled = true;
-        }
+    .fill {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #ffb400, #ff5c00);
+      border-radius: 99px;
+      transition: width 0.15s ease;
+    }
 
-        async function prepareGameAssets() {
-            try {
-                window.assetsReady = false;
-                delete window.xhrInterceptorInstalled;
-                window.mergedBlobUrls = {};
-                setupXHRInterceptor();
+    .loader-status {
+      color: #555; font-size: 11px;
+      letter-spacing: 2px; text-transform: uppercase;
+    }
 
-                const filesToMerge = ['wasm_code_shared.unityweb'];
-                for (const filename of filesToMerge) {
-                    const blobUrl = await mergeSplitFile(filename, 2);
-                    if (blobUrl) window.mergedBlobUrls[filename] = blobUrl;
-                }
+    #game-frame {
+      width: 100vw; height: 100vh;
+      border: none; display: none;
+      position: fixed; inset: 0;
+    }
 
-                window.assetsPrepared = true;
-                window.assetsReady = true;
-            } catch (error) {
-                window.assetsPrepared = false;
-                window.assetsReady = true;
-            }
-        }
-
-        prepareGameAssets();
-    </script>
+    /* Fallback open-in-tab button */
+    #open-btn {
+      display: none;
+      margin-top: 24px;
+      padding: 12px 28px;
+      background: #ffb400; color: #000;
+      font-weight: 800; font-size: 13px;
+      letter-spacing: 2px; border: none;
+      border-radius: 8px; cursor: pointer;
+      text-transform: uppercase;
+      transition: background 0.2s;
+    }
+    #open-btn:hover { background: #ff5c00; color: #fff; }
+  </style>
 </head>
 <body>
-    <script src="masterloader.js"></script>
+
+  <div id="loader-screen">
+    <div class="loader-logo">Subway <span>Surfers</span></div>
+    <div class="track"><div class="fill" id="fill"></div></div>
+    <div class="loader-status" id="status">Connecting to server...</div>
+    <button id="open-btn" onclick="openInBlank()">Open in New Tab</button>
+  </div>
+
+  <iframe
+    id="game-frame"
+    src=""
+    allow="autoplay; fullscreen; gamepad"
+    allowfullscreen
+    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock"
+  ></iframe>
+
+  <script>
+    const GAME_URL   = 'https://ss.randomkzn.com/berlin';
+    const frame      = document.getElementById('game-frame');
+    const loaderEl   = document.getElementById('loader-screen');
+    const fillEl     = document.getElementById('fill');
+    const statusEl   = document.getElementById('status');
+    const openBtn    = document.getElementById('open-btn');
+
+    // ── Fake progress bar while iframe loads ──────────────────────────────────
+    let progress = 0;
+    const STAGES = [
+      { target: 15,  speed: 80,  label: 'Connecting to server...'    },
+      { target: 35,  speed: 60,  label: 'Fetching game assets...'    },
+      { target: 60,  speed: 40,  label: 'Loading Unity engine...'    },
+      { target: 80,  speed: 55,  label: 'Spinning up WebGL...'       },
+      { target: 92,  speed: 70,  label: 'Almost there...'            },
+      { target: 99,  speed: 120, label: 'Waiting for game init...'   },
+    ];
+
+    let stageIdx = 0;
+    let ticker;
+
+    function runStage() {
+      if (stageIdx >= STAGES.length) return;
+      const stage = STAGES[stageIdx];
+      statusEl.textContent = stage.label;
+
+      ticker = setInterval(() => {
+        if (progress < stage.target) {
+          progress += 0.5;
+          fillEl.style.width = progress + '%';
+        } else {
+          clearInterval(ticker);
+          stageIdx++;
+          if (stageIdx < STAGES.length) {
+            setTimeout(runStage, 300);
+          }
+        }
+      }, stage.speed);
+    }
+
+    // ── iframe load handler ───────────────────────────────────────────────────
+    frame.addEventListener('load', () => {
+      clearInterval(ticker);
+      progress = 100;
+      fillEl.style.width = '100%';
+      statusEl.textContent = 'Launching game!';
+
+      setTimeout(() => {
+        loaderEl.classList.add('fade-out');
+        frame.style.display = 'block';
+        setTimeout(() => { loaderEl.style.display = 'none'; }, 450);
+      }, 600);
+    });
+
+    // ── iframe error / blocked handler ────────────────────────────────────────
+    frame.addEventListener('error', handleBlock);
+
+    // Detect X-Frame-Options block via timeout fallback
+    // If after 12s it still hasn't fired 'load' visibly, show fallback
+    let loadTimeout = setTimeout(() => {
+      // Check if game is actually visible
+      try {
+        // If we can access contentDocument it's same origin and fine
+        const doc = frame.contentDocument;
+        if (!doc || !doc.body || doc.body.innerHTML === '') handleBlock();
+      } catch(e) {
+        // Cross-origin — that's expected and fine, game is probably running
+        // Don't show fallback, iframe content is blocked by policy not by X-Frame
+        clearTimeout(loadTimeout);
+      }
+    }, 12000);
+
+    function handleBlock() {
+      clearTimeout(loadTimeout);
+      clearInterval(ticker);
+      fillEl.style.width    = '100%';
+      fillEl.style.background = '#ff3b3b';
+      statusEl.textContent  = 'Direct embed blocked — use the button below';
+      openBtn.style.display = 'block';
+    }
+
+    // ── About:blank injection method ──────────────────────────────────────────
+    // This injects into an about:blank tab so the game runs clean
+    function openInBlank() {
+      const win = window.open('about:blank', '_blank');
+      if (!win) {
+        alert('Pop-up blocked — allow popups for this page and try again.');
+        return;
+      }
+
+      win.document.open();
+      win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{width:100%;height:100%;background:#000;overflow:hidden}
+    iframe{width:100vw;height:100vh;border:none;display:block}
+  </style>
+</head>
+<body>
+  <iframe
+    src="${GAME_URL}"
+    allow="autoplay; fullscreen; gamepad"
+    allowfullscreen
+    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-pointer-lock"
+  ></iframe>
+</body>
+</html>`);
+      win.document.close();
+    }
+
+    // ── Kick it off ───────────────────────────────────────────────────────────
+    runStage();
+    frame.src = GAME_URL;
+  </script>
+
 </body>
 </html>
