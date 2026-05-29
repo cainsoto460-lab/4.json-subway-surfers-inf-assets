@@ -1,10 +1,27 @@
 <base href="https://cdn.jsdelivr.net/gh/cainsoto460-lab/4.json-subway-surfers-inf-assets@main/">
 <html>
-<head>
-    <meta charset="utf-8">
-    <title>Subway Surfers</title>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Subway Surfers: Buenos Aires</title>
+    <script src="Unityloader.2019.js"></script>
     <script>
-        // Kill all ads dead
+        window.config = {
+            loader: "unity",
+            debug: false,
+            maxRatio: 16 / 9,
+            minRatio: 9 / 16,
+            title: 'Subway Surfers: Buenos Aires',
+            unityVersion: '2019.2.0f1',
+            unityWebglBuildUrl: '4.json',
+            unityWebglLoaderUrl: 'Unityloader.2019.js',
+            fileSize: 36,
+            cachedDecompressedFileSizes: {
+                'wasm_framework.unityweb':    93787,
+                'wasm_code_shared.unityweb':  7338464,
+                '4.data.unityweb':            19343219,
+            },
+        };
+
         window.PokiSDK = {
             init:                () => Promise.resolve(),
             gameLoadingStart:    () => {},
@@ -17,68 +34,77 @@
             gameplayStop:        () => {},
         };
 
-        // Fix Unity errors
         window.showUnitywebNoSupport = function() {};
         if (window.parent) window.parent.showUnitywebNoSupport = function() {};
         window.my4399UnityModule = function(m) { return m; };
 
-        // Game config - matches exactly what master-loader expects
-        window.config = {
-            loader:              "unity",
-            debug:               false,
-            title:               "Subway Surfers",
-            maxRatio:            16 / 9,
-            minRatio:            9 / 16,
-            numScreenshots:      0,
-            unityWebglBuildUrl:  "4.json",
-            unityWebglLoaderUrl: "Unityloader.2019.js",
-            fileSize:            36,
-            commentChangeTime:   5000,
-            spinnerRemoveDelay:  1000,
-        };
-
-        // Merge split files
         window.mergedBlobUrls = {};
         window.assetsReady = false;
 
-        async function mergeSplitFile(base, parts) {
-            const urls = Array.from({length: parts}, (_, i) => `${base}.part${i+1}`);
-            const responses = await Promise.all(urls.map(u => fetch(u)));
-            if (responses.some(r => !r.ok)) return null;
-            const buffers = await Promise.all(responses.map(r => r.arrayBuffer()));
-            return URL.createObjectURL(new Blob(buffers, {type: 'application/octet-stream'}));
+        async function mergeSplitFile(fileUrlBase, numParts = 2) {
+            const partUrls = Array.from({ length: numParts }, (_, i) => 
+                `${fileUrlBase}.part${i + 1}`
+            );
+            try {
+                const responses = await Promise.all(partUrls.map(url => fetch(url)));
+                if (responses.some(r => !r.ok)) return null;
+                const parts = await Promise.all(responses.map(r => r.arrayBuffer()));
+                return URL.createObjectURL(new Blob(parts, { type: 'application/octet-stream' }));
+            } catch (error) {
+                return null;
+            }
         }
 
-        function interceptXHR() {
-            const origOpen = XMLHttpRequest.prototype.open;
-            const origSend = XMLHttpRequest.prototype.send;
+        function setupXHRInterceptor() {
+            if (window.xhrInterceptorInstalled) return;
+            const originalOpen = XMLHttpRequest.prototype.open;
+            const originalSend = XMLHttpRequest.prototype.send;
+
             XMLHttpRequest.prototype.open = function(method, url, ...args) {
+                this._url = url;
                 let finalUrl = url;
-                for (const [name, blob] of Object.entries(window.mergedBlobUrls)) {
-                    if (url.includes(name)) { finalUrl = blob; break; }
+                for (const [filename, blobUrl] of Object.entries(window.mergedBlobUrls)) {
+                    if (url.includes(filename)) { finalUrl = blobUrl; break; }
                 }
-                return origOpen.call(this, method, finalUrl, ...args);
+                return originalOpen.call(this, method, finalUrl, ...args);
             };
+
             XMLHttpRequest.prototype.send = function(...args) {
                 const xhr = this;
                 if (!window.assetsReady) {
-                    const wait = setInterval(() => {
-                        if (window.assetsReady) { clearInterval(wait); origSend.apply(xhr, args); }
+                    const checkReady = setInterval(() => {
+                        if (window.assetsReady) { clearInterval(checkReady); originalSend.apply(xhr, args); }
                     }, 50);
                     return;
                 }
-                return origSend.apply(this, args);
+                return originalSend.apply(this, args);
             };
+            window.xhrInterceptorInstalled = true;
         }
 
-        async function prepareAssets() {
-            interceptXHR();
-            const wasmBlob = await mergeSplitFile('wasm_code_shared.unityweb', 2);
-            if (wasmBlob) window.mergedBlobUrls['wasm_code_shared.unityweb'] = wasmBlob;
-            window.assetsReady = true;
+        async function prepareGameAssets() {
+            try {
+                window.assetsReady = false;
+                delete window.xhrInterceptorInstalled;
+                window.mergedBlobUrls = {};
+                setupXHRInterceptor();
+
+                // wasm_code_shared is split into 2 parts
+                const filesToMerge = ['wasm_code_shared.unityweb'];
+                for (const filename of filesToMerge) {
+                    const blobUrl = await mergeSplitFile(filename, 2);
+                    if (blobUrl) window.mergedBlobUrls[filename] = blobUrl;
+                }
+
+                window.assetsPrepared = true;
+                window.assetsReady = true;
+            } catch (error) {
+                window.assetsPrepared = false;
+                window.assetsReady = true;
+            }
         }
 
-        prepareAssets();
+        prepareGameAssets();
     </script>
 </head>
 <body>
